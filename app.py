@@ -137,7 +137,7 @@ def venues():
       changed_venues.append({
         "id": result.id,
         "name": result.name,
-        "num_upcoming_shows": len(list(filter(lambda x: x.start_time > datetime.now(), result.show)))
+        "num_upcoming_shows": result.num_upcoming_shows
       })
 
     location['venues'] = changed_venues
@@ -182,7 +182,7 @@ def show_venue(venue_id):
   venue = Venue.query.get(venue_id)
   past_shows = []
   upcoming_shows = []
-  
+  today_date = datetime.now()
   shows = venue.show
 
   for show in shows:
@@ -190,8 +190,12 @@ def show_venue(venue_id):
       "artist_id" : show.artist_id,
       "artist_name": show.artists.name,
       "artist_image_link": show.artists.image_link,
-      "start_time": str(show.start_time)
+      "start_time": format_datetime(str(show.start_time))
     }
+    if (show.start_time > today_date):
+      upcoming_shows.append(info)
+    else:
+      past_shows.append(info)
 
   data ={
     "id": venue.id,
@@ -227,23 +231,24 @@ def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
   
-  try:
-
-    new_venue = Venue()
-    new_venue.name = request.form['name']
-    new_venue.city = request.form['city']
-    new_venue.state = request.form['state']
-    new_venue.address = request.form['address']
-    new_venue.phone = request.form['phone']
-    new_venue.genres = request.form['genres']
-    new_venue.image_link = request.form['image_link']
-    new_venue.facebook_link = request.form['facebook_link']
-    new_venue.website_link = request.form['website_link']
-    #new_venue.seeking_talent = request.form['seeking_talent'] 
-    #------COMMENTED OUT BECAUSE I KEEP GETTING A STATEMENT ERROR, NOT A BOOLEAN VALUE: 'Y' ETC.
-    new_venue.seeking_description = request.form['seeking_description']
-
+  check= False
+  if request.form['seeking_talent'] == "y":
+    check = True
   
+  new_venue = Venue()
+  new_venue.name = request.form['name']
+  new_venue.city = request.form['city']
+  new_venue.state = request.form['state']
+  new_venue.address = request.form['address']
+  new_venue.phone = request.form['phone']
+  new_venue.genres = request.form['genres']
+  new_venue.image_link = request.form['image_link']
+  new_venue.facebook_link = request.form['facebook_link']
+  new_venue.website_link = request.form['website_link']
+  new_venue.seeking_talent = check
+  new_venue.seeking_description = request.form['seeking_description']
+
+  try:
     db.session.add(new_venue)
     db.session.commit()
 
@@ -332,26 +337,31 @@ def show_artist(artist_id):
   shows = artist.show
   past_shows=[]
   upcoming_shows = []
+  today_date = datetime.now()
   for show in shows:
     info={
       "venue_id": show.id,
       "venue_name": show.venues.name,
       "venue_image_link": show.venues.image_link,
-      "start_time": str(show.start_time)
+      "start_time": format_datetime(str(show.start_time))
     }
-    
+    if (show.start_time > today_date):
+      upcoming_shows.append(info)
+    else:
+      past_shows.append(info)
 
   data ={
     "id": artist.id,
     "name": artist.name,
-    "genres": artist.genres.split(','),
     "city": artist.city,
     "state": artist.state,
     "phone": artist.phone,
-    "website_link": artist.website_link,
+    "genres": artist.genres.split(','),
     "facebook_link": artist.facebook_link,
-    "seeking_description": artist.seeking_description,
+    "website_link": artist.website_link,
     "image_link": artist.image_link,
+    "seeking_venue": artist.seeking_venue,
+    "seeking_description": artist.seeking_description,
     "past_shows": past_shows,
     "upcoming_shows": upcoming_shows,
     "past_shows_count": len(past_shows),
@@ -372,9 +382,11 @@ def edit_artist(artist_id):
     "city": artist_id.city,
     "state": artist_id.state,
     "phone": artist_id.phone,
+    "genres": artist_id.genres,
     "facebook_link": artist_id.facebook_link,
     "website_link": artist_id.website_link,
     "image_link": artist_id.image_link,
+    "seeking_venue": artist_id.seeking_venue,
     "seeking_description": artist_id.seeking_description
   }
   # TODO: populate form with fields from artist with ID <artist_id>
@@ -384,6 +396,11 @@ def edit_artist(artist_id):
 def edit_artist_submission(artist_id):
   # TODO: take values from the form submitted, and update existing
   # artist record with ID <artist_id> using the new attributes
+
+  check= False
+  if request.form['seeking_venue'] == "y":
+    check = True
+  
   artist = Artist.query.get(artist_id)
   artist.name = request.form['name']
   artist.city = request.form['city']
@@ -391,7 +408,9 @@ def edit_artist_submission(artist_id):
   artist.phone = request.form['phone']
   artist.genres = request.form['genres']
   artist.facebook_link = request.form['facebook_link']
+  artist.website_link = request.form['website_link']
   artist.image_link = request.form['image_link']
+  artist.seeking_venue = check
   artist.seeking_description = request.form['seeking_description']
 
   try:
@@ -412,15 +431,16 @@ def edit_venue(venue_id):
   venue = {
     "id": venue_id.id,
     "name": venue_id.name,
-    "genres": venue_id.genres,
-    "address": venue_id.address,
     "city": venue_id.city,
     "state": venue_id.state,
     "phone": venue_id.phone,
+    "address": venue_id.address,
+    "genres": venue_id.genres,
     "facebook_link": venue_id.facebook_link,
     "website_link": venue_id.website_link,
-    "seeking_description": venue_id.seeking_description,
-    "image_link": venue_id.image_link
+    "image_link": venue_id.image_link,
+    "seeking_talent": venue_id.seeking_talent,
+    "seeking_description": venue_id.seeking_description
   }
 
   # TODO: populate form with values from venue with ID <venue_id>
@@ -430,6 +450,10 @@ def edit_venue(venue_id):
 def edit_venue_submission(venue_id):
   # TODO: take values from the form submitted, and update existing
   # venue record with ID <venue_id> using the new attributes
+  check= False
+  if request.form['seeking_talent'] == "y":
+    check = True
+  
   venue = Venue.query.get(venue_id)
   venue.name = request.form['name']
   venue.city = request.form['city']
@@ -438,7 +462,9 @@ def edit_venue_submission(venue_id):
   venue.phone = request.form['phone']
   venue.genres = request.form['genres']
   venue.facebook_link = request.form['facebook_link']
+  venue.website_link = request.form['website_link']
   venue.image_link = request.form['image_link']
+  venue.seeking_talent = check
   venue.seeking_description = request.form['seeking_description']
   try:
     db.session.commit()
@@ -447,6 +473,7 @@ def edit_venue_submission(venue_id):
     print(sys.exc_info())
     db.session.rollback
     flash('Error Artist ' + request.form['name'] + ' could not be edited')
+
   return redirect(url_for('show_venue', venue_id=venue_id))
 
 #  Create Artist
@@ -462,20 +489,21 @@ def create_artist_submission():
   # called upon submitting the new artist listing form
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
+  check= False
+  if request.form['seeking_talent'] == "y":
+    check = True
+  new_artist = Artist()
+  new_artist.name = request.form['name']
+  new_artist.city = request.form['city']
+  new_artist.state = request.form['state']
+  new_artist.phone = request.form['phone']
+  new_artist.genres = request.form['genres']
+  new_artist.image_link = request.form['image_link']
+  new_artist.facebook_link = request.form['facebook_link']
+  new_artist.website_link = request.form['website_link']
+  new_artist.seeking_venue = check
+  new_artist.seeking_description = request.form['seeking_description']
   try:
-
-    new_artist = Artist()
-    new_artist.name = request.form['name']
-    new_artist.city = request.form['city']
-    new_artist.state = request.form['state']
-    new_artist.phone = request.form['phone']
-    new_artist.genres = request.form['genres']
-    new_artist.image_link = request.form['image_link']
-    new_artist.facebook_link = request.form['facebook_link']
-    new_artist.website_link = request.form['website_link']
-    # new_artist.seeking_talent = request.form['seeking_talent'] -----like the others, i keep getting an error if uncommented. 
-    new_artist.seeking_description = request.form['seeking_description']
-
     db.session.add(new_artist)
     db.session.commit()
     # on successful db insert, flash success
